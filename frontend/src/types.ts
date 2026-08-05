@@ -1,6 +1,7 @@
 export interface LevelDef {
   key: string
   label: string
+  sql?: string | null
 }
 
 export interface ForecastConfig {
@@ -9,9 +10,9 @@ export interface ForecastConfig {
   name: string
   active: boolean
   levels: LevelDef[]
-  metric_rules: { default: string; overrides: MetricOverride[] }
-  pipeline_weighting: { mode: string; rate?: number }
-  fact_filters: Record<string, string[]> | null
+  metric_rules: { default?: string; overrides?: MetricOverride[]; sql?: string }
+  pipeline_weighting: { mode: string; min_probability?: number; sql?: string }
+  fact_filters: Record<string, unknown> | null
   bucket_rollups: Record<string, string[]> | null
   source_orders_view: string | null
   source_pipeline_view: string | null
@@ -68,7 +69,21 @@ export interface GridRow {
 export interface Grid {
   config: ForecastConfig
   periods: string[]
+  as_of: string | null
   rows: GridRow[]
+}
+
+export interface Opportunity {
+  opportunity_id: string
+  opportunity_name: string | null
+  account: string | null
+  amount: number
+  win_probability: number
+  stage: string | null
+  close_date: string | null
+  weighted_amount: number
+  included: boolean
+  url: string
 }
 
 export interface AuditRecord {

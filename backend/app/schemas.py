@@ -9,6 +9,10 @@ from pydantic import BaseModel, ConfigDict, Field
 class LevelDef(BaseModel):
     key: str
     label: str
+    # Custom dimensions declare their SQL expression over the standard fact
+    # columns, e.g. "CASE WHEN product_bucket IN ('3ph','Cooling') THEN 'Power'
+    # ELSE 'Other' END". Standard dimensions leave it null.
+    sql: str | None = None
 
 
 class ForecastConfigOut(BaseModel):
@@ -29,7 +33,7 @@ class ForecastConfigOut(BaseModel):
 
 class ForecastConfigIn(BaseModel):
     name: str
-    levels: list[LevelDef] = Field(min_length=1, max_length=3)
+    levels: list[LevelDef] = Field(min_length=1, max_length=8)
     metric_rules: dict = {"default": "orders", "overrides": []}
     pipeline_weighting: dict = {"mode": "win_probability"}
     fact_filters: dict | None = None
@@ -95,7 +99,28 @@ class GridRowOut(BaseModel):
 class GridOut(BaseModel):
     config: ForecastConfigOut
     periods: list[str]
+    as_of: datetime | None = None
     rows: list[GridRowOut]
+
+
+# --- drill-down --------------------------------------------------------------
+
+class OpportunityOut(BaseModel):
+    opportunity_id: str
+    opportunity_name: str | None
+    account: str | None
+    amount: float
+    win_probability: float
+    stage: str | None
+    close_date: str | None
+    weighted_amount: float
+    included: bool
+    url: str
+
+
+class SliceOppsRequest(BaseModel):
+    period_code: str
+    slice_values: dict
 
 
 # --- entry upsert ------------------------------------------------------------

@@ -1,4 +1,11 @@
-import type { AuditRecord, BusinessUnit, Dimension, Grid, Period } from '../types'
+import type {
+  AuditRecord,
+  BusinessUnit,
+  Dimension,
+  Grid,
+  Opportunity,
+  Period,
+} from '../types'
 
 let currentUser = localStorage.getItem('fp.user') || 'demo.user'
 
@@ -32,11 +39,18 @@ export const api = {
   periods: () => request<Period[]>('/api/periods'),
   dimensions: () => request<Dimension[]>('/api/dimensions'),
 
-  grid: (configId: number, periods: string[]) => {
+  grid: (configId: number, periods: string[], asOf?: string) => {
     const qs = new URLSearchParams({ config_id: String(configId) })
     periods.forEach((p) => qs.append('periods', p))
+    if (asOf) qs.set('as_of', asOf)
     return request<Grid>(`/api/forecast/grid?${qs}`)
   },
+
+  sliceOpportunities: (configId: number, periodCode: string, sliceValues: Record<string, string>) =>
+    request<Opportunity[]>(`/api/forecast/configs/${configId}/slice-opportunities`, {
+      method: 'POST',
+      body: JSON.stringify({ period_code: periodCode, slice_values: sliceValues }),
+    }),
 
   saveEntry: (
     configId: number,

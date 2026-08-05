@@ -1,36 +1,70 @@
 """BU + forecast-config administration — how new teams get onboarded."""
+import re
+from types import SimpleNamespace
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from ..database import get_db
 from ..models import BusinessUnit, ForecastConfig
+from ..routers.meta import DIMENSION_CATALOG
 from ..schemas import (
     BusinessUnitIn,
     BusinessUnitOut,
     ForecastConfigIn,
     ForecastConfigOut,
 )
-from ..routers.meta import DIMENSION_CATALOG
+from ..services import sqlgen
 
 router = APIRouter(prefix="/api/business-units", tags=["business-units"])
 
 VALID_DIMENSION_KEYS = {d.key for d in DIMENSION_CATALOG}
+CUSTOM_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+WEIGHTING_MODES = ("win_probability", "threshold", "all", "sql")
 
 
 def _validate_config(payload: ForecastConfigIn) -> None:
     keys = [lv.key for lv in payload.levels]
     if len(set(keys)) != len(keys):
         raise HTTPException(422, "Levels must use distinct dimensions")
-    for key in keys:
-        if key not in VALID_DIMENSION_KEYS:
-            raise HTTPException(422, f"Unknown dimension '{key}'")
+    for lv in payload.levels:
+        if lv.sql:
+            if not CUSTOM_KEY_RE.match(lv.key):
+                raise HTTPException(
+                    422, f"Custom dimension key '{lv.key}' must be a lowercase slug (a-z, 0-9, _)"
+                )
+        elif lv.key not in VALID_DIMENSION_KEYS:
+            raise HTTPException(422, f"Unknown dimension '{lv.key}' (custom levels must declare sql)")
     if "product_rollup" in keys and not payload.bucket_rollups:
         raise HTTPException(422, "product_rollup level requires bucket_rollups")
-    if payload.metric_rules.get("default") not in ("orders", "sales"):
-        raise HTTPException(422, "metric_rules.default must be 'orders' or 'sales'")
-    if payload.pipeline_weighting.get("mode") not in ("win_probability", "flat", "all"):
-        raise HTTPException(422, "pipeline_weighting.mode must be win_probability|flat|all")
+    if not payload.metric_rules.get("sql") and payload.metric_rules.get("default") not in ("orders", "sales"):
+        raise HTTPException(422, "metric_rules.default must be 'orders' or 'sales' (or supply metric_rules.sql)")
+    mode = payload.pipeline_weighting.get("mode")
+    if mode not in WEIGHTING_MODES:
+        raise HTTPException(422, f"pipeline_weighting.mode must be one of {WEIGHTING_MODES}")
+    if mode == "threshold":
+        thr = payload.pipeline_weighting.get("min_probability")
+        if not isinstance(thr, (int, float)) or not 0 <= thr <= 1:
+            raise HTTPException(422, "threshold weighting requires min_probability between 0 and 1")
+
+    # Compile every SQL fragment once so a bad config is rejected at save time,
+    # not when a rep opens the grid.
+    probe = SimpleNamespace(
+        levels=[lv.model_dump() for lv in payload.levels],
+        metric_rules=payload.metric_rules,
+        pipeline_weighting=payload.pipeline_weighting,
+        fact_filters=payload.fact_filters,
+        bucket_rollups=payload.bucket_rollups,
+    )
+    try:
+        for level in probe.levels:
+            sqlgen.level_expr(probe, level)
+        sqlgen.metric_type_expr(probe.metric_rules)
+        sqlgen.pipeline_weight_expr(probe.pipeline_weighting)
+        sqlgen.filter_where(probe.fact_filters)
+    except sqlgen.SqlValidationError as e:
+        raise HTTPException(422, str(e))
 
 
 @router.get("", response_model=list[BusinessUnitOut])

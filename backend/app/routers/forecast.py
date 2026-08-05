@@ -1,17 +1,28 @@
-"""The forecast grid and rep input.
+"""The forecast grid, drill-down, and rep input.
 
 Identity for now is a trusted X-User header (the frontend sends the picked
 user). Swap-in point for SSO: replace `current_user` with a real dependency;
 nothing else changes.
 """
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import ForecastAudit, ForecastConfig, ForecastEntry, Period
-from ..schemas import AuditOut, EntryOut, EntryUpsert, GridOut, GridRowOut
-from ..services.grid import build_grid, make_slice_key
+from ..schemas import (
+    AuditOut,
+    EntryOut,
+    EntryUpsert,
+    GridOut,
+    GridRowOut,
+    OpportunityOut,
+    SliceOppsRequest,
+)
+from ..services.grid import build_grid, make_slice_key, slice_opportunities
+from ..services.sqlgen import SqlValidationError
 
 router = APIRouter(prefix="/api/forecast", tags=["forecast"])
 
@@ -33,6 +44,11 @@ def _get_config(db: Session, config_id: int) -> ForecastConfig:
 def get_grid(
     config_id: int,
     periods: list[str] = Query(min_length=1),
+    as_of: datetime | None = Query(
+        default=None,
+        description="Reconstruct rep input as of this moment (audit replay). "
+        "Source facts are live regardless — fact snapshots come with real-source wiring.",
+    ),
     db: Session = Depends(get_db),
 ):
     config = _get_config(db, config_id)
@@ -40,12 +56,32 @@ def get_grid(
     unknown = [p for p in periods if p not in known]
     if unknown:
         raise HTTPException(422, f"Unknown periods: {unknown}")
-    rows = build_grid(db, config, periods)
+    try:
+        rows = build_grid(db, config, periods, as_of=as_of)
+    except SqlValidationError as e:
+        raise HTTPException(422, f"Config SQL error: {e}")
     return GridOut(
         config=config,
         periods=periods,
+        as_of=as_of,
         rows=[GridRowOut(**row.__dict__) for row in rows],
     )
+
+
+@router.post("/configs/{config_id}/slice-opportunities", response_model=list[OpportunityOut])
+def get_slice_opportunities(
+    config_id: int,
+    payload: SliceOppsRequest,
+    db: Session = Depends(get_db),
+):
+    """The open bfo opportunities building one grid row's pipeline estimate."""
+    config = _get_config(db, config_id)
+    if not db.get(Period, payload.period_code):
+        raise HTTPException(422, f"Unknown period '{payload.period_code}'")
+    try:
+        return slice_opportunities(db, config, payload.period_code, payload.slice_values)
+    except SqlValidationError as e:
+        raise HTTPException(422, f"Config SQL error: {e}")
 
 
 @router.put("/configs/{config_id}/entries", response_model=EntryOut)

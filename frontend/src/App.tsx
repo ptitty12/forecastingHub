@@ -2,9 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, getUser, setUser } from './api/client'
 import type { BusinessUnit, Dimension, Period } from './types'
 import { ForecastPage } from './pages/ForecastPage'
+import { DashboardPage } from './pages/DashboardPage'
 import { AdminPage } from './pages/AdminPage'
 
-type Tab = 'forecast' | 'admin'
+type Tab = 'forecast' | 'dashboard' | 'admin'
+
+const TAB_LABEL: Record<Tab, string> = {
+  forecast: 'Forecast',
+  dashboard: 'Dashboard',
+  admin: 'Administration',
+}
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('forecast')
@@ -41,6 +48,8 @@ export default function App() {
     return null
   }, [businessUnits, configId])
 
+  const showConfigPicker = tab === 'forecast' || tab === 'dashboard'
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-hairline bg-surface">
@@ -56,21 +65,21 @@ export default function App() {
           </div>
 
           <nav className="flex gap-1 text-sm" aria-label="Main">
-            {(['forecast', 'admin'] as const).map((t) => (
+            {(Object.keys(TAB_LABEL) as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`rounded-lg px-3 py-1.5 font-medium capitalize ${
+                className={`rounded-lg px-3 py-1.5 font-medium transition-colors duration-150 ${
                   tab === t ? 'bg-brandwash text-brandink' : 'text-ink2 hover:bg-page'
                 }`}
               >
-                {t === 'forecast' ? 'Forecast' : 'Administration'}
+                {TAB_LABEL[t]}
               </button>
             ))}
           </nav>
 
           <div className="ml-auto flex items-center gap-3">
-            {tab === 'forecast' && (
+            {showConfigPicker && (
               <select
                 value={configId ?? ''}
                 onChange={(e) => setConfigId(Number(e.target.value))}
@@ -105,10 +114,10 @@ export default function App() {
       <main className="mx-auto max-w-7xl px-5 py-5">
         {loadError && (
           <div className="mb-4 rounded-lg border border-neg bg-negwash px-4 py-3 text-sm text-neg">
-            Backend unreachable: {loadError} — is the API running on :8000?
+            Backend unreachable: {loadError} — is the API running on :7999?
           </div>
         )}
-        {tab === 'forecast' &&
+        {(tab === 'forecast' || tab === 'dashboard') &&
           (activeConfig ? (
             <>
               <div className="mb-4">
@@ -119,14 +128,16 @@ export default function App() {
                   Forecasting by {activeConfig.cfg.levels.map((l) => l.label).join(' → ')}
                 </p>
               </div>
-              <ForecastPage key={activeConfig.cfg.id} config={activeConfig.cfg} periods={periods} />
+              {tab === 'forecast' ? (
+                <ForecastPage key={activeConfig.cfg.id} config={activeConfig.cfg} periods={periods} />
+              ) : (
+                <DashboardPage key={activeConfig.cfg.id} config={activeConfig.cfg} periods={periods} />
+              )}
             </>
           ) : (
             !loadError && <p className="text-sm text-muted">No forecast configs yet — onboard a team under Administration.</p>
           ))}
-        {tab === 'admin' && (
-          <AdminPage businessUnits={businessUnits} dimensions={dimensions} onChanged={reload} />
-        )}
+        {tab === 'admin' && <AdminPage businessUnits={businessUnits} dimensions={dimensions} onChanged={reload} />}
       </main>
     </div>
   )

@@ -7,7 +7,7 @@ config-driven design end to end:
   T&E lens rule (Transactional & Edge forecasts on Sales, everything else
   on Orders) and win-probability pipeline weighting.
 - Digital Energy / Field Sales — Region > State > Product Rollup (custom
-  bucket groupings) with a flat 40% pipeline weighting.
+  bucket groupings) with threshold pipeline weighting (opps ≥ 45% only).
 
 Facts span five quarters around the seeded "today" (2026-08-05): two closed
 quarters of actuals, the in-flight quarter with partial actuals + open
@@ -16,7 +16,7 @@ pipeline, and two future quarters that are pipeline-only.
 Idempotent: runs only when the database has no business units.
 """
 import random
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -25,6 +25,7 @@ from .models import (
     BusinessUnit,
     FactOrdersSales,
     FactPipeline,
+    ForecastAudit,
     ForecastConfig,
     ForecastEntry,
     Period,
@@ -108,11 +109,30 @@ def seed_if_empty(db: Session) -> bool:
             {"key": "product_rollup", "label": "Product Group"},
         ],
         metric_rules={"default": "orders", "overrides": []},
-        pipeline_weighting={"mode": "flat", "rate": 0.4},
+        # Threshold weighting: an opp only counts once its win probability
+        # clears the bar the team sets.
+        pipeline_weighting={"mode": "threshold", "min_probability": 0.45},
         fact_filters={"business_unit": ["Digital Energy"]},
         bucket_rollups=DE_ROLLUPS,
     )
-    db.add_all([sp_cfg, de_cfg])
+    # Demonstrates custom SQL dimensions and a non-3 level count: two levels,
+    # the first declared entirely as SQL over the standard fact columns.
+    sp_coast_cfg = ForecastConfig(
+        business_unit_id=sp.id,
+        name="Coast Rollup",
+        levels=[
+            {
+                "key": "coast",
+                "label": "Coast",
+                "sql": "CASE WHEN state IN ('VA', 'NY') THEN 'East' ELSE 'West' END",
+            },
+            {"key": "product_bucket", "label": "Product Bucket"},
+        ],
+        metric_rules={"default": "orders", "overrides": []},
+        pipeline_weighting={"mode": "all"},
+        fact_filters={"business_unit": ["Secure Power"]},
+    )
+    db.add_all([sp_cfg, de_cfg, sp_coast_cfg])
     db.flush()
 
     rng = random.Random(51)  # deterministic seed data
@@ -224,16 +244,35 @@ def seed_if_empty(db: Session) -> bool:
             updated_by="maria.chen",
         ),
     ]
+    # Entries carry a backdated audit trail so change history and the
+    # "see as of" snapshot view have real state to replay in the demo world.
+    entered_at = datetime(2026, 8, 1, 14, 30, tzinfo=timezone.utc)
     for item in sample_entries:
         slice_values = item.pop("slice_values")
+        slice_key = make_slice_key(sp_cfg.levels, slice_values)
         db.add(
             ForecastEntry(
                 config_id=sp_cfg.id,
-                slice_key=make_slice_key(sp_cfg.levels, slice_values),
+                slice_key=slice_key,
                 slice_values=slice_values,
+                updated_at=entered_at,
                 **item,
             )
         )
+        for fieldname in ("adjustment", "total_forecast", "comment"):
+            if item.get(fieldname) is not None:
+                db.add(
+                    ForecastAudit(
+                        config_id=sp_cfg.id,
+                        period_code=item["period_code"],
+                        slice_key=slice_key,
+                        field=fieldname,
+                        old_value=None,
+                        new_value=str(item[fieldname]),
+                        changed_by=item["updated_by"],
+                        changed_at=entered_at,
+                    )
+                )
 
     db.commit()
     return True
