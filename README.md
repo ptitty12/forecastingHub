@@ -25,6 +25,7 @@ docker compose up -d --build     # → http://localhost:7999
 | **[Architecture](docs/ARCHITECTURE.md)** | Engineers | Layers, the config-to-SQL compiler, the grid engine, conventions |
 | **[API reference](docs/API.md)** | Integrators | Every endpoint, request and response shapes, error codes |
 | **[Deployment](docs/DEPLOYMENT.md)** | Operators | Docker, config, persistence, backup, upgrades, SQL Server |
+| **[Overview deck](docs/Forecasting-Pub-Overview.pptx)** | Anyone being shown it | 10 slides of functionality with screenshots ([rebuild](docs/deck/README.md)) |
 | **[CLAUDE.md](CLAUDE.md)** | Agents | The working contract for changing this codebase |
 
 Interactive API docs are served at `/docs` on the running app.
