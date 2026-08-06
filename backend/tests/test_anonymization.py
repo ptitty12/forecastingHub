@@ -28,10 +28,16 @@ FORBIDDEN = [
     "Switch Communications", "Vantage Data Centers", "Iron Mountain",
     "Equinix", "Digital Realty", "Microsoft", "CoreWeave", "Meta Platforms",
     "Oracle Cloud", "Hyper Solutions",
+    # employer + its real business units
+    "Schneider Electric", "Secure Power", "Digital Energy",
     # real product / internal system names
     "GVXL", "EcoStruxure", "Galaxy", "sp_ons", "UsPipelineStandards",
     "partnersalesops", "PartnerSalesOps",
 ]
+
+# Everything user-visible or shipped gets scanned, not just Python.
+SCANNED_GLOBS = ("*.py", "*.ts", "*.tsx", "*.md", "*.html", "*.yml", "*.yaml")
+SKIP_DIRS = {"node_modules", "dist", ".git", "__pycache__", ".vite", "data"}
 
 VALID_LINES = {"Hardware", "Services", "Software"}
 
@@ -48,16 +54,23 @@ def test_seed_source_has_no_real_names():
     assert not hits, f"real names found in seed.py: {hits}"
 
 
-def test_repo_python_has_no_real_names():
-    """Nothing anywhere in the backend package should carry a real name."""
-    root = pathlib.Path(seed.__file__).parent
+def test_whole_repo_has_no_real_names():
+    """Nothing shipped — backend, frontend, docs, compose — carries one.
+
+    This file itself is the one exception: it has to name what it forbids.
+    """
+    repo = pathlib.Path(seed.__file__).resolve().parents[3]
+    me = pathlib.Path(__file__).resolve()
     hits = []
-    for path in root.rglob("*.py"):
-        text = path.read_text().lower()
-        for name in FORBIDDEN:
-            if name.lower() in text:
-                hits.append(f"{path.name}: {name}")
-    assert not hits, f"real names found: {hits}"
+    for pattern in SCANNED_GLOBS:
+        for path in repo.rglob(pattern):
+            if path.resolve() == me or SKIP_DIRS & set(path.parts):
+                continue
+            text = path.read_text(errors="ignore").lower()
+            for name in FORBIDDEN:
+                if name.lower() in text:
+                    hits.append(f"{path.relative_to(repo)}: {name}")
+    assert not hits, f"real names found: {sorted(set(hits))}"
 
 
 def test_seeded_people_are_fictional(client):

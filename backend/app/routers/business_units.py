@@ -12,6 +12,7 @@ from ..routers.meta import DIMENSION_CATALOG
 from ..schemas import (
     BusinessUnitIn,
     BusinessUnitOut,
+    BusinessUnitUpdate,
     ForecastConfigIn,
     ForecastConfigOut,
 )
@@ -85,6 +86,24 @@ def create_business_unit(payload: BusinessUnitIn, db: Session = Depends(get_db))
     return bu
 
 
+@router.put("/{bu_id}", response_model=BusinessUnitOut)
+def update_business_unit(bu_id: int, payload: BusinessUnitUpdate, db: Session = Depends(get_db)):
+    bu = db.get(BusinessUnit, bu_id)
+    if not bu:
+        raise HTTPException(404, "Business unit not found")
+    data = payload.model_dump(exclude_unset=True)
+    new_code = data.get("code")
+    if new_code and new_code != bu.code:
+        clash = db.scalar(select(BusinessUnit).where(BusinessUnit.code == new_code))
+        if clash:
+            raise HTTPException(409, f"Business unit '{new_code}' already exists")
+    for k, v in data.items():
+        setattr(bu, k, v)
+    db.commit()
+    db.refresh(bu)
+    return bu
+
+
 @router.post("/{bu_id}/configs", response_model=ForecastConfigOut, status_code=201)
 def create_config(bu_id: int, payload: ForecastConfigIn, db: Session = Depends(get_db)):
     bu = db.get(BusinessUnit, bu_id)
@@ -111,6 +130,19 @@ def update_config(config_id: int, payload: ForecastConfigIn, db: Session = Depen
     if not config:
         raise HTTPException(404, "Config not found")
     _validate_config(payload)
+    if payload.name != config.name:
+        clash = db.scalar(
+            select(ForecastConfig).where(
+                ForecastConfig.business_unit_id == config.business_unit_id,
+                ForecastConfig.name == payload.name,
+                ForecastConfig.id != config_id,
+            )
+        )
+        if clash:
+            raise HTTPException(409, f"Config '{payload.name}' already exists for this team")
+    # Levels define slice identity: changing them re-slices the grid, and
+    # existing entries keyed to the old shape stop matching. They are kept
+    # (nothing is deleted) but will not surface until the shape matches again.
     for k, v in payload.model_dump().items():
         setattr(config, k, v)
     db.commit()

@@ -84,4 +84,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+
+  updateBusinessUnit: (buId: number, payload: { code?: string; name?: string; description?: string }) =>
+    request<BusinessUnit>(`/api/business-units/${buId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  updateConfig: (configId: number, payload: unknown) =>
+    request(`/api/business-units/configs/${configId}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
 }

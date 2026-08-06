@@ -8,6 +8,7 @@ export interface ForecastConfig {
   id: number
   business_unit_id: number
   name: string
+  /** Inactive views stay in the database but drop out of the forecast picker. */
   active: boolean
   levels: LevelDef[]
   metric_rules: { default?: string; overrides?: MetricOverride[]; sql?: string }

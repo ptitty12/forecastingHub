@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { fmtCompact } from '../../lib/format'
 import { CHROME, seriesColor, useDarkMode } from '../../lib/palette'
+import { InfoTip } from '../InfoTip'
 
 export interface LineSeries {
   name: string
@@ -12,11 +13,13 @@ interface Props {
   series: LineSeries[] // color = slot order, fixed
   height?: number
   title?: string
+  /** Plain-language explanation shown behind a "?" next to the title. */
+  help?: string
 }
 
 const PAD = { top: 12, right: 34, bottom: 26, left: 52 }
 
-export function LineChart({ labels, series, height = 260, title }: Props) {
+export function LineChart({ labels, series, height = 260, title, help }: Props) {
   const dark = useDarkMode()
   const chrome = dark ? CHROME.dark : CHROME.light
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -48,7 +51,12 @@ export function LineChart({ labels, series, height = 260, title }: Props) {
 
   return (
     <div ref={wrapRef} className="relative">
-      {title && <h3 className="mb-2 text-sm font-semibold text-ink">{title}</h3>}
+      {title && (
+        <h3 className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-ink">
+          {title}
+          {help && <InfoTip title={title}>{help}</InfoTip>}
+        </h3>
+      )}
       <svg
         viewBox={`0 0 ${width} ${height}`}
         className="w-full"

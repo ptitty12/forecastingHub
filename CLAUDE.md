@@ -1,7 +1,18 @@
 # Forecasting Pub — agent guide
 
-Read `README.md` first for the architecture. This file is the working
-contract for agents iterating on the codebase.
+Read `README.md` for orientation and `docs/ARCHITECTURE.md` before touching
+the engine. This file is the working contract for changing this codebase.
+
+| Doc | When you need it |
+|---|---|
+| `docs/ARCHITECTURE.md` | changing the engine, the compiler, or the grid |
+| `docs/ADMIN_GUIDE.md` | changing config semantics or the admin UI |
+| `docs/API.md` | changing any endpoint or payload shape |
+| `docs/USER_GUIDE.md` | changing anything a seller sees |
+| `docs/DEPLOYMENT.md` | changing ports, the image, or persistence |
+
+**Docs are part of the change.** A new config field, endpoint, or column
+isn't done until the guide that covers it says so.
 
 ## Ground rules
 
@@ -65,13 +76,13 @@ check all three seeded configs load — they exercise different code paths:
 
 | Config | Exercises |
 |---|---|
-| SP · SAO | 3 levels, structured lens override (software → sales), win-probability weighting |
-| DE · Field Sales | derived `product_rollup` dimension, threshold weighting |
-| SP · Coast Rollup | 2 levels, a custom pure-SQL dimension |
+| NSP · SAO | 3 levels, structured lens override (software → sales), win-probability weighting |
+| AE · Field Sales | derived `product_rollup` dimension, threshold weighting |
+| NSP · Coast Rollup | 2 levels, a custom pure-SQL dimension |
 
 Also check: row expansion (▸) lists opportunities, "see as of" + "compare to
-now" reconstructs past state, and the Dashboard tab's dimension/measure/chart
-switchers.
+now" reconstructs past state, the Dashboard tab's dimension/measure/chart
+switchers, and Administration's Edit / Deactivate round-trip.
 
 ## Style
 
@@ -87,5 +98,14 @@ switchers.
   "Other"), legend always present for ≥2 series, no dual axes.
 - Grid loads keep previous data on screen and fade — never blank the table
   on a refetch (`fetchSeq` guards against stale responses).
+- **Help text lives in `src/lib/help.ts`**, never inline in components, so
+  the wording can be reviewed as prose. Every new column, control, or admin
+  field ships with an `InfoTip` written the house way: plain language, no
+  jargon a seller wouldn't say out loud, one or two sentences — say what the
+  number *is*, then what to *do* with it.
+- Empty and error states explain the fix, not just the failure ("your
+  filters are hiding everything" beats "no rows").
+- Nothing is deleted. Where a delete seems natural, deactivate instead —
+  the audit trail is the point of the product.
 - Keep light AND dark mode working — tokens flip via
   `prefers-color-scheme`; check both when touching styles.

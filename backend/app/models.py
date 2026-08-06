@@ -9,11 +9,11 @@ Three zones:
    so a BU's "how we slice" is pure configuration.
 
 2. CONFIGURATION — BusinessUnit + ForecastConfig. A ForecastConfig declares
-   which dimension columns become that team's L1/L2/L3 levels, its metric
-   lens rules (e.g. Secure Power's "T&E uses Sales, everything else Orders"),
-   how open pipeline is weighted into the suggested forecast, and optional
-   custom product-bucket rollups. Onboarding a new BU = inserting config
-   rows, not writing code.
+   which dimension columns (or custom SQL expressions) become that team's
+   levels, its metric lens rules (e.g. "software uses Sales, everything else
+   Orders"), how open pipeline is weighted into the suggested forecast, and
+   optional custom product-bucket rollups. Onboarding a new team = inserting
+   config rows, not writing code.
 
 3. FORECAST INPUT — ForecastEntry (one row per config x period x slice) and
    ForecastAudit (immutable trail of every change).
@@ -147,16 +147,19 @@ class BusinessUnit(Base):
 class ForecastConfig(Base):
     """How one team forecasts. The heart of the config-driven design.
 
-    levels: ordered list of {"key", "label"} — key is either a standard
-        dimension column or "product_rollup" (derived via bucket_rollups).
-        1 to 3 levels supported by the UI; the model allows more.
+    levels: ordered list of {"key", "label", "sql"?} — 1 to 8 of them. `key`
+        is a standard dimension column, "product_rollup" (derived via
+        bucket_rollups), or a custom slug whose `sql` gives the expression
+        to group by. Compiled in services/sqlgen.py.
     metric_rules: {"default": "orders"|"sales",
                    "overrides": [{"field", "equals", "metric"}, ...]}
-        Applied per fact row — this is how lens rules like
-        "PM0LOB = 'Transactional & Edge' uses Sales" are expressed.
+        or {"sql": "<expression yielding 'Orders'/'Sales'>"}.
+        Applied per fact row — this is how a lens rule like
+        "product_line = 'Software' uses Sales" is expressed.
     pipeline_weighting: {"mode": "win_probability"} |
-                        {"mode": "flat", "rate": 0.4} |
-                        {"mode": "all"}
+                        {"mode": "threshold", "min_probability": 0.45} |
+                        {"mode": "all"} |
+                        {"mode": "sql", "sql": "<weighted amount expr>"}
         How open pipeline contributes to the build-up suggested forecast.
         (The all-bfo-included suggested forecast always uses 100%.)
     fact_filters: optional {"column": [allowed values]} applied to both

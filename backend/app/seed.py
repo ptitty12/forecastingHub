@@ -15,12 +15,12 @@ revenue figure appears in this repository:
 Three business configs are seeded, deliberately shaped differently, to
 exercise the config-driven engine end to end:
 
-- Secure Power / SAO — Seller > Account > Product Bucket, with a lens rule
+- NonSecurePower / SAO — Seller > Account > Product Bucket, with a lens rule
   (software forecasts on Sales, everything else on Orders) and
   win-probability pipeline weighting.
-- Digital Energy / Field Sales — Region > State > Product Rollup (custom
+- Analog Energy / Field Sales — Region > State > Product Rollup (custom
   bucket groupings) with threshold pipeline weighting (opps >= 45% only).
-- Secure Power / Coast Rollup — two levels, the first a pure-SQL dimension.
+- NonSecurePower / Coast Rollup — two levels, the first a pure-SQL dimension.
 
 Facts span five quarters around the seeded "today": two closed quarters of
 actuals, the in-flight quarter with partial actuals plus open pipeline, and
@@ -173,8 +173,8 @@ def seed_if_empty(db: Session) -> bool:
     for code, year, quarter, start, end in PERIODS:
         db.add(Period(code=code, year=year, quarter=quarter, start_date=start, end_date=end))
 
-    sp = BusinessUnit(code="SP", name="Secure Power", description="UPS, cooling, racks, DC infrastructure")
-    de = BusinessUnit(code="DE", name="Digital Energy", description="Grid automation, metering, power systems")
+    sp = BusinessUnit(code="NSP", name="NonSecurePower", description="UPS, cooling, racks, DC infrastructure")
+    de = BusinessUnit(code="AE", name="Analog Energy", description="Grid automation, metering, power systems")
     db.add_all([sp, de])
     db.flush()
 
@@ -192,7 +192,7 @@ def seed_if_empty(db: Session) -> bool:
             "overrides": [{"field": "product_line", "equals": "Software", "metric": "sales"}],
         },
         pipeline_weighting={"mode": "win_probability"},
-        fact_filters={"business_unit": ["Secure Power"]},
+        fact_filters={"business_unit": ["NonSecurePower"]},
         source_orders_view="orders_sales_standard_view",
         source_pipeline_view="pipeline_standard_view",
     )
@@ -208,7 +208,7 @@ def seed_if_empty(db: Session) -> bool:
         # Threshold weighting: an opp only counts once its win probability
         # clears the bar the team sets.
         pipeline_weighting={"mode": "threshold", "min_probability": 0.45},
-        fact_filters={"business_unit": ["Digital Energy"]},
+        fact_filters={"business_unit": ["Analog Energy"]},
         bucket_rollups=DE_ROLLUPS,
     )
     # Demonstrates custom SQL dimensions and a non-3 level count: two levels,
@@ -226,7 +226,7 @@ def seed_if_empty(db: Session) -> bool:
         ],
         metric_rules={"default": "orders", "overrides": []},
         pipeline_weighting={"mode": "all"},
-        fact_filters={"business_unit": ["Secure Power"]},
+        fact_filters={"business_unit": ["NonSecurePower"]},
     )
     db.add_all([sp_cfg, de_cfg, sp_coast_cfg])
     db.flush()
@@ -279,14 +279,14 @@ def seed_if_empty(db: Session) -> bool:
         past = end < TODAY
         current = start <= TODAY <= end
 
-        # Secure Power: seller / account / bucket grain
+        # NonSecurePower: seller / account / bucket grain
         for seller, accounts in SP_SELLERS.items():
             for account in accounts:
                 buckets = set(rng.sample(SP_BUCKETS, rng.randint(4, 6)))
                 buckets |= {b for (s, a, b) in ANCHORS if s == seller and a == account}
                 for bucket in sorted(buckets):
                     dims = dict(
-                        business_unit="Secure Power",
+                        business_unit="NonSecurePower",
                         manager=SP_MANAGER,
                         seller=seller,
                         region="NAM",
@@ -302,12 +302,12 @@ def seed_if_empty(db: Session) -> bool:
                     if not past and rng.random() < 0.8:
                         add_pipeline(code, start, end, **dims)
 
-        # Digital Energy: region / state / bucket grain
+        # Analog Energy: region / state / bucket grain
         for region, states in DE_REGIONS.items():
             for state, utility in states.items():
                 for bucket in rng.sample(DE_BUCKETS, rng.randint(4, 6)):
                     dims = dict(
-                        business_unit="Digital Energy",
+                        business_unit="Analog Energy",
                         manager=DE_MANAGER,
                         seller=rng.choice(DE_SELLERS),
                         region=region,

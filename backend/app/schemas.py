@@ -33,6 +33,10 @@ class ForecastConfigOut(BaseModel):
 
 class ForecastConfigIn(BaseModel):
     name: str
+    # Deactivating hides a config from the forecast picker without deleting
+    # anything — its entries and audit history stay intact and come back if
+    # it is reactivated.
+    active: bool = True
     levels: list[LevelDef] = Field(min_length=1, max_length=8)
     metric_rules: dict = {"default": "orders", "overrides": []}
     pipeline_weighting: dict = {"mode": "win_probability"}
@@ -55,6 +59,14 @@ class BusinessUnitOut(BaseModel):
 class BusinessUnitIn(BaseModel):
     code: str
     name: str
+    description: str | None = None
+
+
+class BusinessUnitUpdate(BaseModel):
+    """Partial update — only the fields present are applied."""
+
+    code: str | None = None
+    name: str | None = None
     description: str | None = None
 
 

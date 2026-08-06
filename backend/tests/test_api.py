@@ -27,10 +27,10 @@ def _config(client, bu_code, name):
 def test_health_and_seed(client):
     assert client.get("/api/health").json() == {"status": "ok"}
     bus = client.get("/api/business-units").json()
-    assert {b["code"] for b in bus} == {"SP", "DE"}
-    sp = _config(client, "SP", "SAO")
+    assert {b["code"] for b in bus} == {"NSP", "AE"}
+    sp = _config(client, "NSP", "SAO")
     assert [lv["key"] for lv in sp["levels"]] == ["seller", "account", "product_bucket"]
-    de = _config(client, "DE", "Field Sales")
+    de = _config(client, "AE", "Field Sales")
     assert de["pipeline_weighting"] == {"mode": "threshold", "min_probability": 0.45}
 
 
@@ -42,7 +42,7 @@ def test_periods_and_dimensions(client):
 
 
 def test_grid_math(client):
-    cfg = _config(client, "SP", "SAO")
+    cfg = _config(client, "NSP", "SAO")
     grid = client.get(
         "/api/forecast/grid", params={"config_id": cfg["id"], "periods": ["2026 Q3"]}
     ).json()
@@ -64,7 +64,7 @@ def test_grid_math(client):
 
 def test_threshold_weighting_math(client):
     """DE uses threshold mode: weighted pipeline only counts opps >= 45%."""
-    cfg = _config(client, "DE", "Field Sales")
+    cfg = _config(client, "AE", "Field Sales")
     grid = client.get(
         "/api/forecast/grid", params={"config_id": cfg["id"], "periods": ["2026 Q4"]}
     ).json()
@@ -83,7 +83,7 @@ def test_threshold_weighting_math(client):
 
 
 def test_slice_opportunities(client):
-    cfg = _config(client, "SP", "SAO")
+    cfg = _config(client, "NSP", "SAO")
     grid = client.get(
         "/api/forecast/grid", params={"config_id": cfg["id"], "periods": ["2026 Q4"]}
     ).json()
@@ -101,7 +101,7 @@ def test_slice_opportunities(client):
 
 def test_custom_sql_level_config(client):
     """Seeded 2-level config with a pure-SQL dimension works end to end."""
-    cfg = _config(client, "SP", "Coast Rollup")
+    cfg = _config(client, "NSP", "Coast Rollup")
     assert len(cfg["levels"]) == 2
     grid = client.get(
         "/api/forecast/grid", params={"config_id": cfg["id"], "periods": ["2026 Q3"]}
@@ -111,7 +111,7 @@ def test_custom_sql_level_config(client):
 
 
 def test_rollup_dimension(client):
-    cfg = _config(client, "DE", "Field Sales")
+    cfg = _config(client, "AE", "Field Sales")
     grid = client.get(
         "/api/forecast/grid", params={"config_id": cfg["id"], "periods": ["2026 Q3"]}
     ).json()
@@ -121,7 +121,7 @@ def test_rollup_dimension(client):
 
 
 def test_entry_upsert_audit_and_as_of(client):
-    cfg = _config(client, "SP", "SAO")
+    cfg = _config(client, "NSP", "SAO")
     slice_values = {"seller": "Cece Parekh", "account": "Skeptic Cloud", "product_bucket": "Monitoring Software"}
 
     r = client.put(
@@ -256,3 +256,72 @@ def test_config_validation(client):
         },
     )
     assert r.status_code == 422
+
+
+def test_edit_business_unit(client):
+    r = client.post("/api/business-units", json={"code": "EDT", "name": "Editable Co"})
+    bu_id = r.json()["id"]
+
+    r = client.put(f"/api/business-units/{bu_id}", json={"name": "Renamed Co", "description": "now with a description"})
+    assert r.status_code == 200, r.text
+    assert r.json()["name"] == "Renamed Co"
+    assert r.json()["description"] == "now with a description"
+    assert r.json()["code"] == "EDT"  # untouched fields survive a partial update
+
+    # code collisions are rejected
+    r = client.put(f"/api/business-units/{bu_id}", json={"code": "NSP"})
+    assert r.status_code == 409
+
+
+def test_edit_config_and_deactivate(client):
+    bus = client.get("/api/business-units").json()
+    bu_id = next(b["id"] for b in bus if b["code"] == "EDT")
+    r = client.post(
+        f"/api/business-units/{bu_id}/configs",
+        json={"name": "Original", "levels": [{"key": "seller", "label": "Seller"}]},
+    )
+    assert r.status_code == 201, r.text
+    cfg_id = r.json()["id"]
+    assert r.json()["active"] is True
+
+    # rename, re-level, re-weight, and deactivate in one edit
+    r = client.put(
+        f"/api/business-units/configs/{cfg_id}",
+        json={
+            "name": "Reshaped",
+            "active": False,
+            "levels": [
+                {"key": "region", "label": "Region"},
+                {"key": "account", "label": "Account"},
+            ],
+            "pipeline_weighting": {"mode": "threshold", "min_probability": 0.6},
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["name"] == "Reshaped"
+    assert body["active"] is False
+    assert [lv["key"] for lv in body["levels"]] == ["region", "account"]
+    assert body["pipeline_weighting"]["min_probability"] == 0.6
+
+    # a deactivated config still serves its grid (nothing is deleted)
+    grid = client.get("/api/forecast/grid", params={"config_id": cfg_id, "periods": ["2026 Q3"]})
+    assert grid.status_code == 200
+
+    # edits are validated the same way creates are
+    r = client.put(
+        f"/api/business-units/configs/{cfg_id}",
+        json={"name": "Reshaped", "levels": [{"key": "nope", "label": "X"}]},
+    )
+    assert r.status_code == 422
+
+    # renaming onto a sibling's name is rejected
+    client.post(
+        f"/api/business-units/{bu_id}/configs",
+        json={"name": "Sibling", "levels": [{"key": "seller", "label": "Seller"}]},
+    )
+    r = client.put(
+        f"/api/business-units/configs/{cfg_id}",
+        json={"name": "Sibling", "levels": [{"key": "region", "label": "Region"}]},
+    )
+    assert r.status_code == 409
