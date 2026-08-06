@@ -17,15 +17,25 @@ from ..schemas import (
     ForecastConfigOut,
 )
 from ..services import sqlgen
+from ..services.grid import probe_sources
 
 router = APIRouter(prefix="/api/business-units", tags=["business-units"])
 
 VALID_DIMENSION_KEYS = {d.key for d in DIMENSION_CATALOG}
+
+
+def _db_message(exc: Exception) -> str:
+    """The driver's message without SQLAlchemy's statement dump."""
+    orig = getattr(exc, "orig", None)
+    text = str(orig) if orig else str(exc)
+    return text.split("\n")[0].strip()[:400]
+
+
 CUSTOM_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 WEIGHTING_MODES = ("win_probability", "threshold", "all", "sql")
 
 
-def _validate_config(payload: ForecastConfigIn) -> None:
+def _validate_config(payload: ForecastConfigIn, db: Session) -> None:
     keys = [lv.key for lv in payload.levels]
     if len(set(keys)) != len(keys):
         raise HTTPException(422, "Levels must use distinct dimensions")
@@ -57,15 +67,24 @@ def _validate_config(payload: ForecastConfigIn) -> None:
         pipeline_weighting=payload.pipeline_weighting,
         fact_filters=payload.fact_filters,
         bucket_rollups=payload.bucket_rollups,
+        source_orders_sql=payload.source_orders_sql,
+        source_pipeline_sql=payload.source_pipeline_sql,
     )
     try:
-        for level in probe.levels:
-            sqlgen.level_expr(probe, level)
-        sqlgen.metric_type_expr(probe.metric_rules)
-        sqlgen.pipeline_weight_expr(probe.pipeline_weighting)
-        sqlgen.filter_where(probe.fact_filters)
+        sqlgen.validate_config_sql(probe)
     except sqlgen.SqlValidationError as e:
         raise HTTPException(422, str(e))
+
+    # Then actually run what this config generates, returning no rows. This is
+    # the only way to know a bring-your-own query parses and exposes every
+    # column the config needs — so the failure lands on the admin, with the
+    # database's own message, rather than on a seller opening the grid.
+    try:
+        probe_sources(db, probe)
+    except sqlgen.SqlValidationError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:  # noqa: BLE001 — surface the driver's message verbatim
+        raise HTTPException(422, f"The source query did not run: {_db_message(e)}")
 
 
 @router.get("", response_model=list[BusinessUnitOut])
@@ -109,7 +128,7 @@ def create_config(bu_id: int, payload: ForecastConfigIn, db: Session = Depends(g
     bu = db.get(BusinessUnit, bu_id)
     if not bu:
         raise HTTPException(404, "Business unit not found")
-    _validate_config(payload)
+    _validate_config(payload, db)
     existing = db.scalar(
         select(ForecastConfig).where(
             ForecastConfig.business_unit_id == bu_id, ForecastConfig.name == payload.name
@@ -129,7 +148,7 @@ def update_config(config_id: int, payload: ForecastConfigIn, db: Session = Depen
     config = db.get(ForecastConfig, config_id)
     if not config:
         raise HTTPException(404, "Config not found")
-    _validate_config(payload)
+    _validate_config(payload, db)
     if payload.name != config.name:
         clash = db.scalar(
             select(ForecastConfig).where(

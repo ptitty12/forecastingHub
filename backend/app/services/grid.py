@@ -58,7 +58,7 @@ def aggregate_orders(db: Session, config: ForecastConfig, periods: list[str]) ->
     sql = f"""
         SELECT fiscal_period, {', '.join(aliased)},
                SUM(CASE WHEN transaction_type = {metric} THEN amount ELSE 0 END) AS actuals
-        FROM fact_orders_sales
+        FROM {sqlgen.orders_source(config)}
         WHERE fiscal_period IN :periods{where}
         GROUP BY fiscal_period, {', '.join(exprs)}
     """
@@ -73,7 +73,7 @@ def aggregate_pipeline(db: Session, config: ForecastConfig, periods: list[str]) 
         SELECT fiscal_period, {', '.join(aliased)},
                SUM(amount) AS pipe_open,
                SUM({weight}) AS pipe_weighted
-        FROM fact_pipeline
+        FROM {sqlgen.pipeline_source(config)}
         WHERE status = 'Open' AND fiscal_period IN :periods{where}
         GROUP BY fiscal_period, {', '.join(exprs)}
     """
@@ -245,7 +245,7 @@ def slice_opportunities(
     sql = f"""
         SELECT opportunity_id, opportunity_name, account, amount, win_probability,
                stage, close_date, {weight} AS weighted_amount, {included} AS included
-        FROM fact_pipeline
+        FROM {sqlgen.pipeline_source(config)}
         WHERE status = 'Open' AND fiscal_period = :period{where}
           AND {' AND '.join(conditions)}
         ORDER BY amount DESC
@@ -267,3 +267,23 @@ def slice_opportunities(
             }
         )
     return out
+
+
+# --- save-time validation ----------------------------------------------------
+
+PROBE_PERIOD = "__forecasting_pub_probe__"  # matches nothing, by construction
+
+
+def probe_sources(db: Session, config: ForecastConfig) -> None:
+    """Execute every query this config generates, returning no rows.
+
+    Catches what static checks cannot: a BYOQ query that does not parse, is
+    missing a contract column, or lacks a column the config's levels, lens
+    or filters reference. Raises the database's own error so the admin sees
+    exactly which column is missing.
+    """
+    aggregate_orders(db, config, [PROBE_PERIOD])
+    aggregate_pipeline(db, config, [PROBE_PERIOD])
+    slice_opportunities(
+        db, config, PROBE_PERIOD, {lv["key"]: "" for lv in config.levels}
+    )

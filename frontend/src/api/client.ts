@@ -5,6 +5,7 @@ import type {
   Grid,
   Opportunity,
   Period,
+  SourceContract,
 } from '../types'
 
 let currentUser = localStorage.getItem('fp.user') || 'demo.user'
@@ -38,6 +39,7 @@ export const api = {
   businessUnits: () => request<BusinessUnit[]>('/api/business-units'),
   periods: () => request<Period[]>('/api/periods'),
   dimensions: () => request<Dimension[]>('/api/dimensions'),
+  sourceContract: () => request<SourceContract[]>('/api/source-contract'),
 
   grid: (configId: number, periods: string[], asOf?: string) => {
     const qs = new URLSearchParams({ config_id: String(configId) })

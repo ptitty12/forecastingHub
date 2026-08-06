@@ -101,10 +101,12 @@ docker compose up -d --build
 
 The volume is untouched, so configs, entries, and history carry across.
 
-**Schema changes:** the app calls `create_all` at startup, which creates
-missing tables but does not alter existing ones. Adding a column to an
-existing table needs a migration (Alembic, or a hand-written `ALTER`) — take
-a backup first. Nothing shipped so far has required one.
+**Schema changes:** at startup the app calls `create_all` (new tables) and
+then `ensure_columns()`, which adds **nullable** columns that exist in the
+model but not yet in the table — so ordinary upgrades against a persisted
+volume just work, and log what they added. Anything beyond that (a NOT NULL
+column, a type change, a rename) raises at startup with the offending column
+named, and needs a hand-written migration. Take a backup before those.
 
 ---
 
@@ -151,9 +153,11 @@ the signal.
 - **Identity is a placeholder.** The `X-User` header is trusted as sent. Do
   not expose the app outside a trusted network until SSO replaces
   `current_user` in `backend/app/routers/forecast.py`.
-- **The admin tab accepts SQL fragments.** They are screened and compiled at
-  save time and the app's fact access is read-only, but access to
-  Administration should be treated like database access.
+- **The admin tab accepts SQL** — both expression fragments and whole
+  bring-your-own-query SELECTs. They are screened, compiled and executed at
+  save time, and the app never writes source data, but a BYOQ query runs
+  with the app's own database privileges. Grant the app a **read-only role**
+  on source schemas, and treat access to Administration as database access.
 - No secrets are baked into the image. `DATABASE_URL` is the only sensitive
   value; keep it in `.env` (git-ignored) or your orchestrator's secret store.
 

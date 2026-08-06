@@ -26,10 +26,22 @@ isn't done until the guide that covers it says so.
   compile to SQL in `services/sqlgen.py` and execute in the database. When
   adding a new configurable behavior, add it as a compiled expression there
   rather than as Python post-processing over fetched rows.
-- **Every SQL fragment passes `guard_sql()` and is compiled at save time.**
-  `_validate_config` in `routers/business_units.py` compiles every fragment
-  when a config is written, so a bad config fails for the admin, not for a
-  rep opening the grid. Keep that property.
+- **Every fragment is guarded, and every generated query is executed at save
+  time.** `_validate_config` in `routers/business_units.py` compiles the
+  fragments and then calls `grid.probe_sources`, which runs each query
+  against a period matching nothing. That is what makes a bring-your-own
+  query safe to allow: a missing column fails for the admin, with the
+  driver's message, not for a rep opening the grid. Keep that property.
+- **Two guards, on purpose.** `guard_sql` for expressions (strict, no UNION);
+  `guard_query` for BYOQ SELECTs (UNION and CTEs allowed, writes rejected).
+  Don't merge them.
+- **The BYOQ contract has one home:** `sqlgen.SOURCE_CONTRACT`, served at
+  `GET /api/source-contract` and rendered by the admin UI. If you change what
+  a source query must return, change it there — never restate it in the UI or
+  the docs.
+- **Migrations are additive.** New columns must be nullable so
+  `database.ensure_columns()` can add them at startup; anything else needs a
+  hand-written migration.
 - **Every rep-input mutation must audit.** Any new editable field goes
   through the `upsert_entry` change-tracking pattern and lands in
   `forecast_audit` — the audit trail is also what powers "see as of", so a

@@ -28,6 +28,25 @@ Fiscal quarters available for forecasting.
    "start_date": "2026-07-01", "end_date": "2026-09-30" }]
 ```
 
+### `GET /api/source-contract`
+
+What a bring-your-own query must return, per source. The admin UI renders
+this directly, so it is always in step with what the engine enforces.
+
+```json
+[{
+  "source": "orders",
+  "standard_table": "fact_orders_sales",
+  "required_columns": {
+    "fiscal_period": "text — must match a period code exactly, e.g. '2026 Q3'",
+    "transaction_type": "text — 'Orders' (bookings) or 'Sales' (invoiced)",
+    "amount": "number — signed; summed as-is"
+  },
+  "standard_dimensions": ["business_unit", "manager", "seller", "…"],
+  "notes": ["Return a SELECT (a leading WITH … is fine). UNION is allowed…"]
+}]
+```
+
 ### `GET /api/dimensions`
 
 The standard dimensions a config may use as levels. `derived: true` marks
@@ -115,12 +134,15 @@ Both take the same body. Everything except `name` and `levels` is optional.
 | `pipeline_weighting.mode` | `win_probability` · `threshold` (needs `min_probability` 0–1) · `all` · `sql` (needs `sql`) |
 | `fact_filters` | `{ "column": [values] }` per standard dimension, and/or `{ "_sql": "raw fragment" }` |
 | `active` | `false` hides the view from the picker; nothing is deleted |
+| `source_orders_sql` / `source_pipeline_sql` | BYOQ. A SELECT (or `WITH …`) that replaces the standard fact table as the FROM source. Must return the columns in `GET /api/source-contract` plus everything this config references. UNION allowed; statement separators, comments and DML rejected. Validated by execution at save time. |
 
 **Responses:** 201/200 with the stored config · 404 unknown BU or config ·
 409 duplicate name · 422 validation, with `detail` naming the problem.
 
-Every SQL fragment is compiled at save time; malformed or non-read-only
-fragments are rejected here rather than at read time.
+Every SQL fragment is compiled at save time, and every query the config
+generates is **executed** against a period that matches nothing — so a BYOQ
+query missing a column fails here, with the database's message in `detail`,
+rather than at read time.
 
 ---
 

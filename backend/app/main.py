@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .database import Base, SessionLocal, engine
+from .database import Base, SessionLocal, engine, ensure_columns
 from .routers import business_units, forecast, meta
 from .seed import seed_if_empty
 
@@ -15,6 +15,9 @@ from .seed import seed_if_empty
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    added = ensure_columns()
+    if added:
+        print(f"[startup] added missing columns: {', '.join(added)}")
     with SessionLocal() as db:
         seed_if_empty(db)
     yield

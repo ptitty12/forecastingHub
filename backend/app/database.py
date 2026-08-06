@@ -27,3 +27,34 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def ensure_columns() -> list[str]:
+    """Add model columns missing from existing tables.
+
+    `create_all` makes new tables but never alters existing ones, so an
+    upgrade against a persisted volume would otherwise fail on a new column.
+    Only nullable columns are added — anything else needs a real migration
+    and is reported instead of guessed at.
+    """
+    from sqlalchemy import inspect, text
+
+    added: list[str] = []
+    insp = inspect(engine)
+    for table in Base.metadata.sorted_tables:
+        if not insp.has_table(table.name):
+            continue
+        existing = {c["name"] for c in insp.get_columns(table.name)}
+        for col in table.columns:
+            if col.name in existing:
+                continue
+            if not col.nullable:
+                raise RuntimeError(
+                    f"{table.name}.{col.name} is missing and is NOT NULL — "
+                    "this upgrade needs a hand-written migration."
+                )
+            ddl = f"ALTER TABLE {table.name} ADD COLUMN {col.name} {col.type.compile(engine.dialect)}"
+            with engine.begin() as conn:
+                conn.execute(text(ddl))
+            added.append(f"{table.name}.{col.name}")
+    return added

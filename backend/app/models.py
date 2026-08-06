@@ -167,8 +167,13 @@ class ForecastConfig(Base):
     bucket_rollups: optional {"Rollup name": ["bucket", ...]} enabling the
         derived "product_rollup" dimension.
     source_orders_view / source_pipeline_view: names of the real SQL
-        views to read in production; unused while running on skeletons but
-        stored now so swap-in is a config change.
+        views to read in production; documentation only.
+    source_orders_sql / source_pipeline_sql: optional bring-your-own
+        queries. When set, the query becomes the FROM source in place of
+        the standard fact table and everything else composes on top of it
+        unchanged. It must return the columns in
+        sqlgen.SOURCE_CONTRACT plus anything this config references;
+        that is verified by executing the composed query at save time.
     """
 
     __tablename__ = "forecast_configs"
@@ -185,6 +190,10 @@ class ForecastConfig(Base):
     bucket_rollups: Mapped[dict | None] = mapped_column(JSON)
     source_orders_view: Mapped[str | None] = mapped_column(String(256))
     source_pipeline_view: Mapped[str | None] = mapped_column(String(256))
+    # BYOQ: when set, this query replaces the standard fact table as the
+    # FROM source. Must satisfy sqlgen.SOURCE_CONTRACT.
+    source_orders_sql: Mapped[str | None] = mapped_column(Text)
+    source_pipeline_sql: Mapped[str | None] = mapped_column(Text)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 

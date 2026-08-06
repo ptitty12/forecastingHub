@@ -129,6 +129,95 @@ of this setting, so the optimistic ceiling is always one glance away.
 
 ---
 
+## Bring your own query (BYOQ)
+
+Sometimes filters aren't enough — the real extraction unions several source
+systems, applies rules the standard table doesn't carry, or needs a
+restatement window. In that case a team can supply **its own SELECT** for
+either source, and the rest of the engine composes on top of it unchanged:
+levels, metric rules, weighting, filters and drill-down all still apply.
+
+Find it under **Bring your own query** in the setup panel. Leave both boxes
+blank to read the standard tables.
+
+### The contract
+
+Your query is wrapped as a subquery, so it must return certain columns.
+"Required" means *selectable* — if the underlying data has no such value,
+select a literal (`NULL AS stage`).
+
+**Orders & sales** — replaces `fact_orders_sales`:
+
+| Column | Type | Notes |
+|---|---|---|
+| `fiscal_period` | text | Must match a period code exactly, e.g. `2026 Q3` |
+| `transaction_type` | text | `Orders` (bookings) or `Sales` (invoiced) |
+| `amount` | number | Signed; summed as-is |
+
+**Open pipeline** — replaces `fact_pipeline`:
+
+| Column | Type | Notes |
+|---|---|---|
+| `fiscal_period` | text | Must match a period code exactly |
+| `status` | text | Only rows equal to `Open` are counted |
+| `amount` | number | Full, unweighted deal value |
+| `win_probability` | number | **0 to 1**, not 0 to 100 |
+| `opportunity_id` | text | Shown in the drill-down |
+| `opportunity_name`, `account`, `stage`, `close_date` | text / date | Drill-down labels; `NULL` allowed |
+
+**Plus every column your config references** — level columns, lens rule
+fields, and filter columns. If you slice by `seller`, the query must return
+`seller`.
+
+The live contract is always available at `GET /api/source-contract`, and the
+setup panel shows it inline behind *What must it return?* — so it can't
+drift from what the engine enforces.
+
+### Rules and conveniences
+
+- **UNION and CTEs are allowed and expected.** A leading `WITH …` is fine.
+- **Row grain is yours.** The engine only aggregates, so one row per line,
+  per header, or pre-aggregated all work.
+- **No trailing semicolon, no comments, nothing that writes.** Statement
+  separators and DML/DDL are rejected outright.
+- **Validation runs your query.** On save, the app executes everything the
+  config generates with a period that matches nothing. A missing column
+  fails *for you*, with the database's own message — never for a seller
+  opening the grid.
+
+### Example
+
+```sql
+WITH oracle AS (
+    SELECT period AS fiscal_period, 'Orders' AS transaction_type,
+           booked_amount AS amount, rep AS seller, customer AS account
+    FROM oracle_bookings
+    WHERE booked_amount <> 0
+), pos AS (
+    -- POS gives ships only, so it lands as Sales
+    SELECT period AS fiscal_period, 'Sales' AS transaction_type,
+           invoiced AS amount, rep AS seller, customer AS account
+    FROM pos_ships
+)
+SELECT * FROM oracle
+UNION ALL
+SELECT * FROM pos
+```
+
+### Before you reach for it
+
+BYOQ is powerful but it is code, held in configuration. Prefer the standard
+table plus filters when it can express the same thing — it is easier for the
+next person to read, and it stays correct when the standard tables gain
+columns. Reach for BYOQ when the logic genuinely cannot be expressed
+declaratively.
+
+**Security:** a BYOQ query runs with the app's own database privileges.
+Grant the app a read-only role on your source schemas, and treat access to
+this tab as you would database access.
+
+---
+
 ## Editing a team
 
 Press **Edit** on any view. The panel loads its current setup; change what

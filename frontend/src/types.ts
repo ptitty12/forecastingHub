@@ -17,6 +17,17 @@ export interface ForecastConfig {
   bucket_rollups: Record<string, string[]> | null
   source_orders_view: string | null
   source_pipeline_view: string | null
+  /** BYOQ: when set, replaces the standard fact table as the source. */
+  source_orders_sql: string | null
+  source_pipeline_sql: string | null
+}
+
+export interface SourceContract {
+  source: string
+  standard_table: string
+  required_columns: Record<string, string>
+  standard_dimensions: string[]
+  notes: string[]
 }
 
 export interface MetricOverride {

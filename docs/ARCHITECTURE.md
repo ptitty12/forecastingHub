@@ -84,11 +84,38 @@ input without writing audit rows silently breaks "see as of".
 | `pipeline_weight_expr` | a per-row weighted-amount expression |
 | `pipeline_included_expr` | 1/0 — does this deal count at all (drives the drill-down's "counted" flag) |
 | `filter_where` | additional WHERE clauses |
+| `orders_source` / `pipeline_source` | the FROM source: the standard fact table, or a team's BYOQ query wrapped as a subquery |
 
 `grid.py` composes those into two aggregation queries — one per fact table —
 and runs them. **The grouping happens in the database, not in Python.** That
 is what makes pointing a config at a real warehouse view a config change
 rather than a rewrite.
+
+### Bring your own query
+
+`source_orders_sql` / `source_pipeline_sql` on a config replace the standard
+fact table as the FROM source. Everything above composes on top of the
+subquery unchanged, which is why the feature costs so little: the only new
+concept is *where FROM points*.
+
+Two guards, deliberately different:
+
+- `guard_sql` screens **expressions** (levels, lens, weighting). Strict —
+  an expression never needs UNION or anything statement-shaped.
+- `guard_query` screens **BYOQ queries**. Allows UNION and CTEs, since real
+  extractions union several systems; still rejects statement separators,
+  comments, and DML/DDL, and requires a leading SELECT or WITH.
+
+The contract a BYOQ query must satisfy lives in one place —
+`sqlgen.SOURCE_CONTRACT` — and is served to the admin UI at
+`GET /api/source-contract`, so documentation, UI, and enforcement cannot
+drift apart.
+
+**Validation is execution.** `grid.probe_sources` runs every query the
+config generates against a period that matches nothing. Static checks
+cannot know whether a hand-written query exposes `seller`; running it can.
+The failure therefore lands on the admin who wrote the query, carrying the
+driver's own message, rather than on a seller opening the grid.
 
 ### Safety model
 
@@ -97,10 +124,10 @@ Three layers, in order of importance:
 1. **Fact access is read-only.** No app code writes source tables.
 2. **Fragments are admin-authored.** Writing SQL requires access to the
    admin API. Treat that access like database access.
-3. **`guard_sql()` screens tokens** — statement separators, comments, and
-   DML/DDL keywords are rejected — and `_validate_config` compiles every
-   fragment **at save time**, so a bad config fails for the admin who wrote
-   it rather than the seller who opens the grid.
+3. **The guards screen tokens** — statement separators, comments, and
+   DML/DDL are rejected — and `_validate_config` compiles *and executes*
+   every query **at save time**, so a bad config fails for the admin who
+   wrote it rather than the seller who opens the grid.
 
 Layer 3 is defense in depth, not the primary control. Don't loosen 1 or 2 on
 the strength of it.
@@ -201,6 +228,10 @@ swap-in point for SSO; nothing else needs to change.
 
 - **No deletes.** Deactivation everywhere a delete would be expected — the
   audit trail is the point of the product.
+- **Additive migrations only.** `database.ensure_columns()` adds nullable
+  columns missing from existing tables at startup, so an upgrade against a
+  persisted volume works; anything else (NOT NULL, type changes, renames)
+  raises rather than guessing, and needs a real migration.
 - **No per-BU code paths.** If a change would add one, it belongs in config
   instead.
 - **No dual-axis charts, no generated colours.** Consistency beats novelty

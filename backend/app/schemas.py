@@ -29,6 +29,8 @@ class ForecastConfigOut(BaseModel):
     bucket_rollups: dict | None = None
     source_orders_view: str | None = None
     source_pipeline_view: str | None = None
+    source_orders_sql: str | None = None
+    source_pipeline_sql: str | None = None
 
 
 class ForecastConfigIn(BaseModel):
@@ -44,6 +46,20 @@ class ForecastConfigIn(BaseModel):
     bucket_rollups: dict | None = None
     source_orders_view: str | None = None
     source_pipeline_view: str | None = None
+    # BYOQ — must satisfy the contract at GET /api/source-contract. Validated
+    # by executing the composed query when the config is saved.
+    source_orders_sql: str | None = None
+    source_pipeline_sql: str | None = None
+
+
+class SourceContractOut(BaseModel):
+    """What a bring-your-own query must return."""
+
+    source: str
+    standard_table: str
+    required_columns: dict[str, str]
+    standard_dimensions: list[str]
+    notes: list[str]
 
 
 class BusinessUnitOut(BaseModel):

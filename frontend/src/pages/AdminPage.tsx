@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import type { BusinessUnit, Dimension, ForecastConfig, MetricOverride } from '../types'
 import { InfoTip } from '../components/InfoTip'
 import { HelpBanner } from '../components/HelpBanner'
+import { ByoqEditor } from '../components/ByoqEditor'
 import { ADMIN_HELP, ADMIN_STEPS } from '../lib/help'
 
 interface Props {
@@ -135,6 +136,8 @@ function configToPayload(cfg: ForecastConfig) {
     bucket_rollups: cfg.bucket_rollups,
     source_orders_view: cfg.source_orders_view,
     source_pipeline_view: cfg.source_pipeline_view,
+    source_orders_sql: cfg.source_orders_sql,
+    source_pipeline_sql: cfg.source_pipeline_sql,
   }
 }
 
@@ -222,6 +225,16 @@ function ConfigCard({
             {weighting.mode === 'threshold' && ` (≥ ${Math.round((weighting.min_probability ?? 0) * 100)}%)`}
           </dd>
         </div>
+        {(cfg.source_orders_sql || cfg.source_pipeline_sql) && (
+          <div className="sm:col-span-2">
+            <dt className="inline font-medium">Custom query:</dt>{' '}
+            <dd className="inline">
+              {[cfg.source_orders_sql && 'orders & sales', cfg.source_pipeline_sql && 'pipeline']
+                .filter(Boolean)
+                .join(' · ')}
+            </dd>
+          </div>
+        )}
         {cfg.source_orders_view && (
           <div className="sm:col-span-2">
             <dt className="inline font-medium">Sources:</dt>{' '}
@@ -345,6 +358,8 @@ function ConfigPanel({
   )
   const [sourceOrders, setSourceOrders] = useState(editing?.source_orders_view ?? '')
   const [sourcePipeline, setSourcePipeline] = useState(editing?.source_pipeline_view ?? '')
+  const [ordersSql, setOrdersSql] = useState(editing?.source_orders_sql ?? '')
+  const [pipelineSql, setPipelineSql] = useState(editing?.source_pipeline_sql ?? '')
   const [status, setStatus] = useState<{ tone: 'ok' | 'err'; msg: string } | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -389,6 +404,8 @@ function ConfigPanel({
       bucket_rollups,
       source_orders_view: sourceOrders.trim() || null,
       source_pipeline_view: sourcePipeline.trim() || null,
+      source_orders_sql: ordersSql.trim() || null,
+      source_pipeline_sql: pipelineSql.trim() || null,
     }
   }
 
@@ -755,6 +772,15 @@ function ConfigPanel({
             </div>
           )}
         </div>
+
+        <ByoqEditor
+          ordersSql={ordersSql}
+          pipelineSql={pipelineSql}
+          onChange={(patch) => {
+            if (patch.ordersSql !== undefined) setOrdersSql(patch.ordersSql)
+            if (patch.pipelineSql !== undefined) setPipelineSql(patch.pipelineSql)
+          }}
+        />
 
         <details>
           <summary className="cursor-pointer text-xs font-medium text-ink2">Production source views (optional)</summary>

@@ -47,6 +47,7 @@ database.
 | **Pipeline weighting** — how open deals count | only deals ≥ 45% likely, at full value |
 | **Product groups** — custom bucket rollups | 6 buckets → Hardware / Software / Services |
 | **Filters** — which source rows belong to this team | `business_unit = 'Analog Energy'` |
+| **Bring your own query** — a whole SELECT when filters aren't enough | union several ERPs, then slice it the normal way |
 
 Onboarding a team is a form in the Administration tab. No schema changes, no
 new endpoints, no new screens, no deploy.
@@ -86,7 +87,7 @@ backend/
     services/grid.py     aggregation, slice universe, audit replay, drill-down
     routers/             HTTP surface and validation
     seed.py              the invented demo world
-  tests/                 18 tests, including an anonymization guard
+  tests/                 28 tests, incl. BYOQ, migration and anonymization guards
 frontend/
   src/pages/             ForecastPage · DashboardPage · AdminPage
   src/components/        InfoTip, HelpBanner, charts, editable cells
