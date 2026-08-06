@@ -56,7 +56,7 @@ def test_grid_math(client):
         r
         for r in rows
         if r["slice_values"]
-        == {"seller": "Adam Roberts", "account": "Switch Communications", "product_bucket": "3ph"}
+        == {"seller": "Jess Day", "account": "Toggle Telecom", "product_bucket": "Power Hardware"}
     )
     assert adj_row["adjustment"] == -1_250_000.0
     assert adj_row["effective_total"] == pytest.approx(adj_row["suggested_buildup"] - 1_250_000.0, abs=0.05)
@@ -116,13 +116,13 @@ def test_rollup_dimension(client):
         "/api/forecast/grid", params={"config_id": cfg["id"], "periods": ["2026 Q3"]}
     ).json()
     groups = {r["slice_values"]["product_rollup"] for r in grid["rows"]}
-    assert groups <= {"Grid Hardware", "Digital Grid", "Services", "Other"}
-    assert "Grid Hardware" in groups
+    assert groups <= {"Hardware", "Software", "Services", "Other"}
+    assert "Hardware" in groups
 
 
 def test_entry_upsert_audit_and_as_of(client):
     cfg = _config(client, "SP", "SAO")
-    slice_values = {"seller": "Maria Chen", "account": "Equinix", "product_bucket": "Software"}
+    slice_values = {"seller": "Cece Parekh", "account": "Skeptic Cloud", "product_bucket": "Monitoring Software"}
 
     r = client.put(
         f"/api/forecast/configs/{cfg['id']}/entries",
@@ -132,7 +132,7 @@ def test_entry_upsert_audit_and_as_of(client):
             "adjustment": 500000,
             "set_fields": ["adjustment"],
         },
-        headers={"X-User": "maria.chen"},
+        headers={"X-User": "cece.parekh"},
     )
     assert r.status_code == 200, r.text
     checkpoint = datetime.now(timezone.utc)  # between the two edits
@@ -145,7 +145,7 @@ def test_entry_upsert_audit_and_as_of(client):
             "total_forecast": 2000000,
             "set_fields": ["total_forecast"],
         },
-        headers={"X-User": "maria.chen"},
+        headers={"X-User": "cece.parekh"},
     )
     assert r.json()["total_forecast"] == 2000000
     assert r.json()["adjustment"] is None
@@ -184,7 +184,7 @@ def test_entry_upsert_audit_and_as_of(client):
     audit = client.get(
         f"/api/forecast/configs/{cfg['id']}/audit", params={"period_code": "2026 Q3"}
     ).json()
-    fields = [(a["field"], a["new_value"]) for a in audit if a["changed_by"] == "maria.chen"]
+    fields = [(a["field"], a["new_value"]) for a in audit if a["changed_by"] == "cece.parekh"]
     assert ("adjustment", "500000.0") in fields
     assert ("total_forecast", "2000000.0") in fields
 

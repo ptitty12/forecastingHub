@@ -3,7 +3,7 @@
 Three zones:
 
 1. SOURCE FACTS (read-only skeletons) — stand-ins for the real standard
-   tables (sp_ons-shaped orders/sales, UsPipelineStandards-shaped pipeline).
+   tables (the standardized orders/sales view, the standardized pipeline view).
    In production these are fed by external processes; the app never writes
    them. They carry a superset of the dimension columns any BU forecasts by,
    so a BU's "how we slice" is pure configuration.

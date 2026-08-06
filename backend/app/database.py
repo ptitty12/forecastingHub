@@ -1,7 +1,7 @@
 """Database setup.
 
 SQLite by default for local dev. Set DATABASE_URL to point at SQL Server
-(mssql+pyodbc://...) when wiring up the real PartnerSalesOps-hosted tables.
+(mssql+pyodbc://...) when wiring up the real warehouse-hosted tables.
 The app only ever READS the fact tables (orders/sales, pipeline) — they are
 managed by external processes in production.
 """

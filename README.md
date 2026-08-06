@@ -18,11 +18,11 @@ which is exactly how BUs already express their slicing today:
 | Config field | What it controls | Example |
 |---|---|---|
 | `levels` | The levels the team forecasts to — **1 to 8 of them**. Standard dimensions by key, or fully custom: `{"key": "coast", "label": "Coast", "sql": "CASE WHEN state IN ('VA','NY') THEN 'East' ELSE 'West' END"}` | SAO: Seller → Account → Product Bucket |
-| `metric_rules` | Orders vs Sales per row. Structured (`default` + `overrides`) or straight SQL: an expression yielding `'Orders'`/`'Sales'` | T&E lens: `product_line = 'Transactional & Edge'` → sales |
+| `metric_rules` | Orders vs Sales per row. Structured (`default` + `overrides`) or straight SQL: an expression yielding `'Orders'`/`'Sales'` | lens rule: `product_line = 'Software'` → sales, everything else orders |
 | `pipeline_weighting` | How open pipeline feeds the build-up suggestion: `win_probability`, `threshold` (only count opps at ≥ X% win probability), `all`, or a custom `sql` expression | DE: threshold ≥ 45% |
-| `bucket_rollups` | Custom product-bucket groupings (derived `product_rollup` dimension) | DE groups 6 buckets into 3 |
+| `bucket_rollups` | Custom product-bucket groupings (derived `product_rollup` dimension) | DE folds 6 buckets into Hardware / Software / Services |
 | `fact_filters` | Row restriction: `{"column": [values]}` and/or a raw `{"_sql": "…"}` fragment | `business_unit = 'Secure Power'` |
-| `source_*_view` | The real SQL views to read in production | `partnersalesops.dbo.sp_ons` |
+| `source_*_view` | The SQL views to read in production | `db.schema.orders_sales_view` |
 
 The engine (`services/sqlgen.py` + `services/grid.py`) compiles these into
 the aggregation queries that run **in the database** — so when a config
@@ -76,7 +76,8 @@ no schema changes, no new endpoints, no new screens.
 - `backend/app/services/sqlgen.py` — the config-to-SQL compiler + guard.
 - `backend/app/services/grid.py` — aggregation orchestration, slice
   universe, as-of reconstruction, opportunity drill-down.
-- `backend/app/seed.py` — deterministic demo world: 3 differently-shaped
+- `backend/app/seed.py` — deterministic **invented** demo world (see
+  "Demo data" below): 3 differently-shaped
   configs (incl. a custom-SQL dimension), 5 quarters of facts, entries with
   a backdated audit trail.
 - `frontend/src/pages/` — ForecastPage, DashboardPage, AdminPage.
@@ -90,6 +91,26 @@ no schema changes, no new endpoints, no new screens.
 - **Total forecast** = build-up + adjustment. Reps edit either the
   adjustment or the total; they stay linked and **the last edit wins**.
 - Future quarters are always enterable: the slice universe carries forward.
+
+## Demo data is entirely invented
+
+This repository is public, so nothing in it describes real business. The
+seeded world is fiction by construction:
+
+| Field | What you'll see |
+|---|---|
+| Accounts | puns on well-known companies — *Toggle Telecom*, *Macrohard*, *Inequinox*, *Analog Realty*, *Scattered Edison*, *Tennessee Valley Suggestion* … never a real customer |
+| Sellers & managers | New Girl characters — Jess Day, Nick Miller, Winston Bishop, Cece Parekh, Schmidt, Coach, Aly Nelson, Reagan Lucas, Russell Schiller, Bob Day |
+| Products | generic categories only: `product_line` is Hardware / Services / Software, `product_bucket` the finer split (Power Hardware, Field Services, Grid Software, …) |
+| Amounts | random draws from a fixed seed (`Random(51)`), scaled so the *shape* is plausible — hardware deals large, services mid, software small, Q4 strong, Q1 soft. The numbers themselves mean nothing. |
+| Opportunity links | every drill-down row points at one placeholder Salesforce id |
+
+`backend/tests/test_anonymization.py` enforces this: it scans the backend
+package for a denylist of real company, employee, product, and internal
+system names, and asserts the seeded people, accounts, and product lines
+come only from the invented sets. If you reintroduce a real name, the suite
+fails. Add new names to `FORBIDDEN` there when you learn of one worth
+guarding.
 
 ## Run it
 

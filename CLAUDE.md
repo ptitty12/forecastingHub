@@ -23,6 +23,13 @@ contract for agents iterating on the codebase.
   through the `upsert_entry` change-tracking pattern and lands in
   `forecast_audit` — the audit trail is also what powers "see as of", so a
   field that skips it silently breaks point-in-time views.
+- **The demo world stays invented.** This repo is public. Never put a real
+  customer, employee, product, or internal system/table name into seed data,
+  code comments, tests, or docs — accounts are puns, people are New Girl
+  characters, products are Hardware/Services/Software, amounts are random.
+  `tests/test_anonymization.py` enforces it via a denylist; when you learn of
+  another real name worth guarding, add it to `FORBIDDEN` rather than
+  loosening the test.
 - **Orders ≠ Sales.** Orders = bookings, Sales = invoicing. Fact queries
   filter `transaction_type`; the lens SQL decides which one per row.
 - Adjustment and total are linked, last-edit-wins. Preserve the
@@ -45,7 +52,7 @@ check all three seeded configs load — they exercise different code paths:
 
 | Config | Exercises |
 |---|---|
-| SP · SAO | 3 levels, structured lens override (T&E → sales), win-probability weighting |
+| SP · SAO | 3 levels, structured lens override (software → sales), win-probability weighting |
 | DE · Field Sales | derived `product_rollup` dimension, threshold weighting |
 | SP · Coast Rollup | 2 levels, a custom pure-SQL dimension |
 

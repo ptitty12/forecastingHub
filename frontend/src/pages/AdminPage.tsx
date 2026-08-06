@@ -414,8 +414,8 @@ function OnboardPanel({ businessUnits, dimensions, onChanged }: Props) {
         <details>
           <summary className="cursor-pointer text-xs font-medium text-ink2">Production source views (optional)</summary>
           <div className="mt-2 space-y-2">
-            <input className={inputCls} placeholder="Orders/sales view, e.g. partnersalesops.dbo.sp_ons" value={sourceOrders} onChange={(e) => setSourceOrders(e.target.value)} />
-            <input className={inputCls} placeholder="Pipeline view, e.g. ...UsPipelineStandards" value={sourcePipeline} onChange={(e) => setSourcePipeline(e.target.value)} />
+            <input className={inputCls} placeholder="Orders/sales view, e.g. db.schema.orders_sales_view" value={sourceOrders} onChange={(e) => setSourceOrders(e.target.value)} />
+            <input className={inputCls} placeholder="Pipeline view, e.g. db.schema.pipeline_view" value={sourcePipeline} onChange={(e) => setSourcePipeline(e.target.value)} />
           </div>
         </details>
 
