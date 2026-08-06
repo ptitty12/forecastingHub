@@ -35,10 +35,23 @@ contract for agents iterating on the codebase.
 - Adjustment and total are linked, last-edit-wins. Preserve the
   `set_fields` semantics in `EntryUpsert` if you touch saving.
 
-## Ports
+## Ports & topology
 
 Backend runs on **7999** (uvicorn, Docker, and the Vite proxy all agree).
 Frontend dev server on 5173.
+
+**Dev runs two processes; a deployment runs one.** Vite exists only for
+hot-reload. `docker compose up -d --build` compiles the frontend into the
+image and FastAPI serves it from the same process as the API — see the
+static mount at the bottom of `app/main.py`. When touching that mount, the
+`FRONTEND_DIST` env var, or the ports, keep all four in agreement:
+`Dockerfile`, `docker-compose.yml`, `vite.config.ts` proxy, and
+`app/main.py`.
+
+SQLite lives on the `forecasting-data` volume at `/app/data` — the app's
+configs, entries, and audit trail. Never write app data anywhere else in the
+container; nothing outside `/app/data` persists, and the container runs as
+non-root uid 10001 so most other paths aren't writable.
 
 ## Verify your work
 

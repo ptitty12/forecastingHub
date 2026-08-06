@@ -112,7 +112,81 @@ come only from the invented sets. If you reintroduce a real name, the suite
 fails. Add new names to `FORBIDDEN` there when you learn of one worth
 guarding.
 
-## Run it
+## Deploy it
+
+**One command, one service, one port:**
+
+```bash
+docker compose up -d --build
+```
+
+Open <http://localhost:7999>. That's the whole deployment — the UI and the
+API are the same service, and the database seeds itself on first start.
+
+```bash
+docker compose logs -f      # follow logs
+docker compose ps           # status (incl. health)
+docker compose down         # stop (data survives)
+docker compose down -v      # stop AND erase the data volume
+```
+
+### Why it's one service, when local dev runs two
+
+Local development runs two processes — uvicorn and the Vite dev server —
+purely for frontend hot-reload. **A deployment has no Vite.** The image
+build compiles the frontend to static files, and FastAPI serves those files
+alongside the API from a single process:
+
+```
+docker compose up
+        │
+        ▼
+┌─────────────────────────────────────────┐
+│ image build (multi-stage)               │
+│   stage 1  node   → npm run build → dist│
+│   stage 2  python → FastAPI + that dist │
+└─────────────────────────────────────────┘
+        │  one container, one port :7999
+        ▼
+   /            → the React app (static files)
+   /api/*       → the API
+   /docs        → interactive API docs
+```
+
+So there's no reverse proxy to configure, no CORS in production, no second
+container to keep in sync.
+
+### Configuration
+
+Everything is optional — the defaults work with no setup.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PORT` | `7999` | Host port to publish. `PORT=8080 docker compose up -d` moves it. |
+| `DATABASE_URL` | SQLite on the data volume | Point at SQL Server to use the real warehouse (see below). |
+
+Put overrides in a `.env` file next to `docker-compose.yml`; Compose reads
+it automatically.
+
+### Data persistence
+
+The app's own tables — business units, forecast configs, forecast entries,
+and the audit trail that powers "see as of" — live in SQLite on the named
+volume `forecasting-data`, mounted at `/app/data`. They survive
+`docker compose down`, rebuilds, and image upgrades. Only `down -v` erases
+them.
+
+To back up: `docker compose cp app:/app/data/forecasting_pub.db ./backup.db`
+
+Two notes if you change the storage:
+
+- Moving to SQL Server means the app's tables get created there on first
+  start; the volume then only matters if you switch back.
+- If you swap the named volume for a **bind mount** (`./data:/app/data`),
+  chown the host directory to uid `10001` — the container runs as a
+  non-root user, and bind mounts keep host ownership.
+
+## Run it locally (development)
 
 Backend (API on **:7999**, seeds itself on first start):
 
@@ -122,7 +196,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 7999
 ```
 
-Frontend (dev server on :5173, proxies /api to :7999):
+Frontend (dev server on :5173, proxies `/api` to :7999):
 
 ```bash
 cd frontend
@@ -130,14 +204,8 @@ npm install
 npm run dev
 ```
 
-Single container (frontend compiled in, FastAPI serves it on :7999):
-
-```bash
-docker build -t forecasting-pub .
-docker run -p 7999:7999 forecasting-pub
-```
-
-Tests:
+Use <http://localhost:5173> while developing — that's the one with
+hot-reload. Tests:
 
 ```bash
 cd backend && python3 -m pytest tests/

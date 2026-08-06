@@ -1,0 +1,39 @@
+# Deploy the whole app:
+#
+#   docker compose up -d --build
+#
+# Then open http://localhost:7999 — the API and the UI are the same service
+# on the same port. Nothing else to start.
+
+services:
+  app:
+    build: .
+    image: forecasting-pub:latest
+    container_name: forecasting-pub
+    restart: unless-stopped
+    ports:
+      - "${PORT:-7999}:7999"
+    environment:
+      # SQLite on the mounted volume by default — no database to run.
+      # To use SQL Server instead, set this in a .env file beside this one:
+      #   DATABASE_URL=mssql+pyodbc://user:pass@host/db?driver=ODBC+Driver+18+for+SQL+Server
+      # (the image would then also need the ODBC driver + the pyodbc package)
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/forecasting_pub.db}
+    volumes:
+      # Persists configs, forecast entries, and the audit trail across
+      # rebuilds and container replacement. Drop this and the volume below
+      # only if you truly want a throwaway instance.
+      - forecasting-data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:7999/api/health').read()
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  forecasting-data:
