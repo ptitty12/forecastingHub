@@ -94,7 +94,8 @@ check all three seeded configs load — they exercise different code paths:
 
 Also check: row expansion (▸) lists opportunities, "see as of" + "compare to
 now" reconstructs past state, the Dashboard tab's dimension/measure/chart
-switchers, and Administration's Edit / Deactivate round-trip.
+switchers, the state map (shaded under AE · Field Sales, explained-empty
+under the two NSP views), and Administration's Edit / Deactivate round-trip.
 
 ## Style
 
@@ -107,7 +108,12 @@ switchers, and Administration's Edit / Deactivate round-trip.
   the `.tnum` class.
 - Charts: plain SVG in `components/charts/`, fixed categorical slot order
   from `lib/palette.ts` (never cycle or generate hues; fold the tail into
-  "Other"), legend always present for ≥2 series, no dual axes.
+  "Other"), legend always present for ≥2 series, no dual axes. Magnitude uses
+  the sequential ramp, never categorical slots.
+- The state map's geometry is pre-projected into `lib/usStates.ts` so the app
+  ships no mapping library and fetches nothing at runtime. It keys off the
+  standard `state` dimension, so it lights up for any view configured with a
+  State level and explains itself for the ones without.
 - Grid loads keep previous data on screen and fade — never blank the table
   on a refetch (`fetchSeq` guards against stale responses).
 - **Help text lives in `src/lib/help.ts`**, never inline in components, so
