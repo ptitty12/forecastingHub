@@ -23,6 +23,15 @@ export const CATEGORICAL_DARK = [
   '#e66767',
 ]
 
+/** Sequential ramp for magnitude (the map): one hue, light → dark on light
+ *  surfaces, dim → bright on dark ones. Never used for identity. */
+export const SEQUENTIAL_LIGHT = ['#e4f6e8', '#b6e8c3', '#7fd39a', '#3fae6b', '#0e6f2b']
+export const SEQUENTIAL_DARK = ['#173322', '#1e5533', '#277d46', '#33a95a', '#5fdd77']
+
+/** The Michigan highlight. Deliberately outside both scales — it marks a place,
+ *  never a number, so it must not read as "the biggest state". */
+export const HIGHLIGHT = { light: '#c3457a', dark: '#e87ba4' }
+
 export const CHROME = {
   light: { grid: '#e1e0d9', axis: '#c3c2b7', muted: '#898781', ink: '#0b0b0b', surface: '#fcfcfb' },
   dark: { grid: '#2c2c2a', axis: '#383835', muted: '#898781', ink: '#ffffff', surface: '#1a1a19' },
@@ -44,4 +53,15 @@ export function useDarkMode(): boolean {
 export function seriesColor(i: number, dark: boolean): string {
   const pal = dark ? CATEGORICAL_DARK : CATEGORICAL_LIGHT
   return pal[i % pal.length]
+}
+
+/** Position on the sequential ramp, `t` clamped to 0…1. */
+export function rampColor(t: number, dark: boolean): string {
+  const pal = dark ? SEQUENTIAL_DARK : SEQUENTIAL_LIGHT
+  const i = Math.round(Math.min(1, Math.max(0, t)) * (pal.length - 1))
+  return pal[i]
+}
+
+export function highlightColor(dark: boolean): string {
+  return dark ? HIGHLIGHT.dark : HIGHLIGHT.light
 }

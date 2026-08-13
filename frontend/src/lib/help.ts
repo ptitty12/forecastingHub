@@ -136,6 +136,18 @@ export const ADMIN_HELP = {
 } as const
 
 export const DASHBOARD_HELP = {
+  map: {
+    title: 'Where the number is',
+    body: 'Your total forecast for the selected quarters, spread across the states it is coming from. The darker the state, the more of your number is riding on it.',
+  },
+  mapNoStates: {
+    title: 'Where the number is',
+    body: 'This view is not sliced by state, so there is nothing to put on the map. An administrator can add a State level under Administration and it will fill in.',
+  },
+  mapFiltered: {
+    title: 'Where the number is',
+    body: 'Your filters are hiding every state. Clear one above and the map fills back in.',
+  },
   trajectory: {
     title: 'Forecast trajectory',
     body: 'How actuals, the suggestion, and the committed forecast move quarter to quarter. A big gap between the green and blue lines means a lot is still riding on pipeline.',

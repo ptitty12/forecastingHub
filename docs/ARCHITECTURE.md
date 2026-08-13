@@ -196,10 +196,11 @@ selected view.
 | `pages/ForecastPage.tsx` | the entry grid, drill-down, as-of/compare, totals, visuals |
 | `pages/DashboardPage.tsx` | charts and the dimension/measure explorer |
 | `pages/AdminPage.tsx` | onboarding and editing views |
-| `components/charts/` | plain-SVG line and stacked bar |
+| `components/charts/` | plain-SVG line, stacked bar, and US state map |
 | `components/InfoTip.tsx` | the "?" affordance used throughout |
 | `lib/help.ts` | **every explanation string in the app, in one file** |
-| `lib/palette.ts` | fixed categorical colour order, light and dark steps |
+| `lib/palette.ts` | fixed categorical colour order, the sequential ramp, light and dark steps |
+| `lib/usStates.ts` | generated state outlines, pre-projected to an Albers USA frame |
 
 Conventions worth keeping:
 
@@ -209,7 +210,14 @@ Conventions worth keeping:
   `fetchSeq` ref discards stale responses so fast clicking can't land out of
   order.
 - **Colour comes from `lib/palette.ts` in fixed slot order** — never cycled,
-  never generated. Past 7 series, fold the tail into "Other".
+  never generated. Past 7 series, fold the tail into "Other". Magnitude (the
+  map) uses the sequential ramp instead, so shading always reads as "more",
+  and the Michigan marker sits outside both scales because it isn't a number.
+- **The map carries no dependency.** `lib/usStates.ts` holds simplified state
+  outlines already projected into a 960×500 Albers USA frame, so rendering is
+  a `<path>` per state. It reads the standard `state` dimension, which is what
+  lets one component serve every view that forecasts by state — and say so
+  plainly for the views that don't.
 - **Tokens, not hex.** `bg-surface`, `text-ink2`, `text-brandink` etc. are
   defined in `index.css` and flip for dark mode.
 - Numeric columns get `.tnum` so digits line up.

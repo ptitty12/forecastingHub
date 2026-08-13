@@ -4,6 +4,7 @@ import type { ForecastConfig, Grid, GridRow, Period } from '../types'
 import { StatTile } from '../components/StatTile'
 import { LineChart } from '../components/charts/LineChart'
 import { StackedBarChart } from '../components/charts/StackedBarChart'
+import { UsStateMap } from '../components/charts/UsStateMap'
 import { InfoTip } from '../components/InfoTip'
 import { HelpBanner } from '../components/HelpBanner'
 import { DASHBOARD_HELP } from '../lib/help'
@@ -81,6 +82,27 @@ export function DashboardPage({ config, periods }: Props) {
       ),
     [rows],
   )
+
+  // The map reads the standard `state` dimension — so it fills in for any view
+  // configured with a State level, and stays empty (and says why) for the rest.
+  const hasStateLevel = config.levels.some((lv) => lv.key === 'state')
+
+  const stateValues = useMemo(() => {
+    const out: Record<string, number> = {}
+    if (!hasStateLevel) return out
+    for (const r of rows) {
+      const code = (r.slice_values['state'] || '').trim().toUpperCase()
+      if (!code) continue
+      out[code] = (out[code] ?? 0) + r.effective_total
+    }
+    return out
+  }, [rows, hasStateLevel])
+
+  const mapNote = !hasStateLevel
+    ? DASHBOARD_HELP.mapNoStates.body
+    : Object.keys(stateValues).length === 0
+      ? DASHBOARD_HELP.mapFiltered.body
+      : undefined
 
   const labels = selectedPeriods
 
@@ -189,6 +211,17 @@ export function DashboardPage({ config, periods }: Props) {
       </div>
 
       {error && <div className="rounded-lg border border-neg bg-negwash px-4 py-3 text-sm text-neg">{error}</div>}
+
+      {/* the map, first thing on the page */}
+      <div className="rounded-xl border border-hairline bg-surface p-5">
+        <UsStateMap
+          title={DASHBOARD_HELP.map.title}
+          help={hasStateLevel ? DASHBOARD_HELP.map.body : DASHBOARD_HELP.mapNoStates.body}
+          measureLabel="Total forecast"
+          values={stateValues}
+          note={mapNote}
+        />
+      </div>
 
       {/* KPIs */}
       <div className="flex flex-wrap gap-3">

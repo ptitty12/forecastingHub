@@ -65,8 +65,9 @@ Salesforce opportunities behind it, each linking out to the record.
 entered then, replayed from the audit trail. "Compare to now" adds current
 values and deltas.
 
-**Dashboard tab** — trajectory line, plus a breakdown explorer with
-measure/group-by switchers and stacked-bar or line rendering.
+**Dashboard tab** — a US state map of where the number is coming from, a
+trajectory line, plus a breakdown explorer with measure/group-by switchers
+and stacked-bar or line rendering.
 
 **Administration tab** — add and edit teams: levels (including custom SQL
 dimensions), metric rules, weighting, product groups. Deactivate instead of
