@@ -161,8 +161,7 @@ Same numbers, drawn as charts.
 - **Where the number is** — a US map at the top, shading each state by how
   much of your total forecast is coming from it. Hover a state for the exact
   figure. It fills in for views that forecast by state; if yours doesn't, the
-  map says so and an administrator can add a **State** level. Michigan is
-  always marked, for reasons that are entirely Ben's fault.
+  map says so and an administrator can add a **State** level.
 - **Forecast trajectory** — actuals, the suggestion, and the committed
   forecast across quarters. A wide gap between the lines means a lot is
   still riding on pipeline landing.

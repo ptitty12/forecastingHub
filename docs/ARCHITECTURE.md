@@ -211,8 +211,7 @@ Conventions worth keeping:
   order.
 - **Colour comes from `lib/palette.ts` in fixed slot order** — never cycled,
   never generated. Past 7 series, fold the tail into "Other". Magnitude (the
-  map) uses the sequential ramp instead, so shading always reads as "more",
-  and the Michigan marker sits outside both scales because it isn't a number.
+  map) uses the sequential ramp instead, so shading always reads as "more".
 - **The map carries no dependency.** `lib/usStates.ts` holds simplified state
   outlines already projected into a 960×500 Albers USA frame, so rendering is
   a `<path>` per state. It reads the standard `state` dimension, which is what

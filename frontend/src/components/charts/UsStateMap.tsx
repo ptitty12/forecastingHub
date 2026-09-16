@@ -4,7 +4,6 @@ import {
   CHROME,
   SEQUENTIAL_DARK,
   SEQUENTIAL_LIGHT,
-  highlightColor,
   rampColor,
   useDarkMode,
 } from '../../lib/palette'
@@ -23,8 +22,6 @@ interface Props {
   note?: string
 }
 
-/** Michigan is marked on every map, data or not. */
-const HIGHLIGHT_STATE = 'MI'
 /** Below this on-screen width a state has no room for its own label. */
 const MIN_LABEL_WIDTH = 34
 
@@ -32,20 +29,14 @@ export function UsStateMap({ values, measureLabel, title, help, note }: Props) {
   const dark = useDarkMode()
   const chrome = dark ? CHROME.dark : CHROME.light
   const ramp = dark ? SEQUENTIAL_DARK : SEQUENTIAL_LIGHT
-  const marker = highlightColor(dark)
   const [hover, setHover] = useState<string | null>(null)
 
   const max = useMemo(() => Math.max(0, ...Object.values(values)), [values])
-  const michigan = US_STATES.find((s) => s.code === HIGHLIGHT_STATE)!
-
-  // Michigan only takes the marker colour when it has no number of its own —
-  // a filled state must always mean "this much business", never "look here".
-  const michiganIsData = values[HIGHLIGHT_STATE] !== undefined
 
   const fillFor = (code: string) => {
     const v = values[code]
     if (v === undefined) {
-      return code === HIGHLIGHT_STATE ? marker : chrome.grid
+      return chrome.grid
     }
     return rampColor(max > 0 ? v / max : 0, dark)
   }
@@ -88,16 +79,6 @@ export function UsStateMap({ values, measureLabel, title, help, note }: Props) {
           />
         ))}
 
-        {/* Michigan's outline sits above its neighbours so it never gets cut. */}
-        <path
-          d={michigan.d}
-          fill="none"
-          stroke={marker}
-          strokeWidth={michiganIsData ? 4 : 2}
-          strokeLinejoin="round"
-          pointerEvents="none"
-        />
-
         {US_STATES.filter((s) => values[s.code] !== undefined && s.w >= MIN_LABEL_WIDTH).map((s) => (
           <text
             key={s.code}
@@ -112,35 +93,6 @@ export function UsStateMap({ values, measureLabel, title, help, note }: Props) {
             {s.code}
           </text>
         ))}
-
-        {/* The declaration. Points at Michigan; subtlety is not the goal. */}
-        <g pointerEvents="none" aria-hidden="true">
-          <path
-            d={`M${michigan.cx + 4},${michigan.cy + 46} C${michigan.cx - 20},${michigan.cy + 100} ${
-              michigan.cx - 60
-            },${michigan.cy + 110} ${michigan.cx - 96},${michigan.cy + 124}`}
-            fill="none"
-            stroke={marker}
-            strokeWidth={3}
-            strokeLinecap="round"
-            strokeDasharray="7 7"
-          />
-          <text
-            x={500}
-            y={340}
-            textAnchor="middle"
-            fontSize={108}
-            fontWeight={800}
-            letterSpacing={-3}
-            fill={marker}
-            stroke={chrome.surface}
-            strokeWidth={12}
-            paintOrder="stroke"
-            transform="rotate(-7 500 340)"
-          >
-            i love Ben
-          </text>
-        </g>
       </svg>
 
       {/* Sequential legend: colour is magnitude, so it needs a scale, not keys. */}
@@ -160,10 +112,6 @@ export function UsStateMap({ values, measureLabel, title, help, note }: Props) {
         <span className="flex items-center gap-1.5">
           <span className="inline-block size-2.5 rounded-sm" style={{ background: chrome.grid }} />
           No forecast here
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block size-2.5 rounded-sm" style={{ background: marker }} />
-          Michigan
         </span>
       </div>
 

@@ -59,7 +59,10 @@ def test_whole_repo_has_no_real_names():
 
     This file itself is the one exception: it has to name what it forbids.
     """
-    repo = pathlib.Path(seed.__file__).resolve().parents[3]
+    # seed.py is at <repo>/backend/app/seed.py, so parents[2] is the repo
+    # root. Anchoring any higher would scan whatever happens to sit beside
+    # the checkout and report another project's files as this one's.
+    repo = pathlib.Path(seed.__file__).resolve().parents[2]
     me = pathlib.Path(__file__).resolve()
     hits = []
     for pattern in SCANNED_GLOBS:
